@@ -1,0 +1,102 @@
+#include "Arduino.h"
+#include "SoftwareSerial.h"
+#include "DFRobotDFPlayerMini.h"
+
+// Define software serial pins for DFPlayer Mini (RX = 9, TX = 10)
+#define DFPLAYER_RX 9
+#define DFPLAYER_TX 10
+
+SoftwareSerial mySoftwareSerial(DFPLAYER_RX, DFPLAYER_TX);
+DFRobotDFPlayerMini myDFPlayer;
+
+// Define flex sensor pins
+#define FLEX_INDEX A1
+#define FLEX_MIDDLE A2
+#define FLEX_RING A3
+
+// Variables to store flex sensor values
+int indexFinger, middleFinger, ringFinger;
+int lastPlayedAudio = -1;  // Stores last played gesture
+unsigned long lastPlayTime = 0; // Timestamp for last played gesture
+const unsigned long cooldownTime = 5000; // 5 seconds cooldown
+
+void setup() {
+  Serial.begin(115200);  // Start Serial Monitor
+  mySoftwareSerial.begin(9600); // DFPlayer Mini communication
+
+  // Initialize DFPlayer Mini
+  if (!myDFPlayer.begin(mySoftwareSerial)) {
+    Serial.println("❌ DFPlayer Mini not detected! Check connections.");
+    while (true); // Halt if DFPlayer fails
+  }
+
+  Serial.println("✅ DFPlayer Mini ready.");
+  myDFPlayer.volume(30);  // Set volume (0-30)
+  delay(1000);  // Allow module to initialize
+
+  // Print table header with finger names
+  Serial.println("Index_Finger\tMiddle_Finger\tRing_Finger\tGesture");
+}
+
+void loop() {
+  // Read values from flex sensors
+  indexFinger = analogRead(FLEX_INDEX);
+  middleFinger = analogRead(FLEX_MIDDLE);
+  ringFinger = analogRead(FLEX_RING);
+
+  // Map flex sensor values to binary (0 = straight, 1 = bent)
+  int angleIndex = map(indexFinger, 100, 250, 0, 1);
+  int angleMiddle = map(middleFinger, 100, 180, 0, 1);
+  int angleRing = map(ringFinger, 100, 180, 0, 1);
+
+  // Detect gesture
+  String gestureText = detectGesture(angleIndex, angleMiddle, angleRing);
+
+  // Print values with finger names
+  Serial.print("Index: "); Serial.print(indexFinger); Serial.print("\t");
+  Serial.print("Middle: "); Serial.print(middleFinger); Serial.print("\t");
+  Serial.print("Ring: "); Serial.print(ringFinger); Serial.print("\t");
+  Serial.println(gestureText);
+
+  // Play corresponding audio
+  playGestureAudio(gestureText);
+  
+  delay(500); // Small delay for stability
+}
+
+String detectGesture(int angleIndex, int angleMiddle, int angleRing) {
+  if (angleIndex == 1 && angleMiddle == 0 && angleRing == 0) {
+    return "Gesture 2: ENTE PEERU VIMUN";
+  } else if (angleIndex == 0 && angleMiddle == 0 && angleRing == 0) {
+    return "Gesture 6: THANK YOU";
+  } else if (angleIndex == 1 && angleMiddle == 1 && angleRing == 0) {
+    return "Gesture 4: NINGALUDE PEERU ENDANU";
+  } else if (angleIndex == 0 && angleMiddle == 1 && angleRing == 0) {
+    return "Gesture 3: NINGALK SUGAMANO";
+  } else if (angleIndex == 1 && angleMiddle == 1 && angleRing == 1) {
+    return "Gesture 1: HAI NAMASKARAM";
+  } else if (angleIndex == 0 && angleMiddle == 1 && angleRing == 1) {
+    return "Gesture 5: IAM SO HAPPY";
+  } else {
+    return "No Gesture Detected";
+  }
+}
+
+void playGestureAudio(String gestureText) {
+  int trackNumber = -1;
+
+  if (gestureText.startsWith("Gesture 1")) trackNumber = 1;
+  else if (gestureText.startsWith("Gesture 2")) trackNumber = 2;
+  else if (gestureText.startsWith("Gesture 3")) trackNumber = 3;
+  else if (gestureText.startsWith("Gesture 4")) trackNumber = 4;
+  else if (gestureText.startsWith("Gesture 5")) trackNumber = 5;
+  else if (gestureText.startsWith("Gesture 6")) trackNumber = 6;
+
+  // Play audio only if it's a new gesture or 5 seconds have passed
+  if (trackNumber != -1 && (trackNumber != lastPlayedAudio || millis() - lastPlayTime >= cooldownTime)) {
+    
+    myDFPlayer.play(trackNumber);  // Play corresponding audio file
+    lastPlayedAudio = trackNumber;  // Store last played gesture
+    lastPlayTime = millis();  // Update last play timestamp
+  }
+}
