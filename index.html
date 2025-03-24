@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Glove Gesture Monitoring</title>
+    <script src="/socket.io/socket.io.js"></script>
+
+    <script>
+        const socket = io();
+
+        let lastGesture = null;
+        let lastPlayTime = 0;
+
+        // Listen for raw data
+        socket.on('rawData', (rawText) => {
+            updateDiv('rawDataDiv', rawText);
+        });
+
+        // Listen for extracted gesture message
+        socket.on('gestureData', (gestureText) => {
+            updateDiv('gestureDataDiv', gestureText, true);
+            document.getElementById('latestGesture').innerText = gestureText; // Update latest gesture
+            playAudio(gestureText); // Play corresponding audio
+        });
+
+        function updateDiv(divId, text, highlight = false) {
+            let div = document.getElementById(divId);
+
+            let newData = document.createElement("div");
+            newData.classList.add("entry");
+            if (highlight) newData.classList.add("highlight");
+            newData.innerText = text;
+
+            div.appendChild(newData);
+
+            if (div.children.length > 10) {
+                div.removeChild(div.firstChild);
+            }
+
+            div.scrollTo({ top: div.scrollHeight, behavior: "smooth" });
+        }
+
+        function playAudio(gesture) {
+            let currentTime = Date.now();
+
+            // Play only if 5 seconds have passed OR if it's a new gesture
+            if (gesture !== lastGesture || (currentTime - lastPlayTime >= 5000)) {
+                let audio = document.getElementById("gestureAudio");
+
+                let audioMap = {
+                    "THANK YOU": "0006.mp3",
+                    "HAI NAMASKARAM": "0001.mp3",
+                    "ENTE PEERU VIMUN": "0002.mp3",
+                    "NINGALK SUGAMANO": "0004.mp3",
+                    "NINGALUDE PEERU ENDANU": "0003.mp3",
+                    "IAM SO HAPPY": "0005.mp3"
+                };
+
+                if (audioMap[gesture]) {
+                    let newAudioSrc = "/audio/" + audioMap[gesture];
+
+                    // Update audio src directly
+                    audio.src = newAudioSrc;
+                    audio.load(); // Ensure the new file loads
+
+                    // Try playing audio and handle autoplay errors
+                    audio.play().catch(error => console.log("Audio play failed:", error));
+
+                    // Update last played gesture and time
+                    lastGesture = gesture;
+                    lastPlayTime = currentTime;
+                }
+            }
+        }
+
+        // Ensure user interaction allows audio playback
+        document.addEventListener("click", () => {
+            let audio = document.getElementById("gestureAudio");
+            audio.play().catch(error => console.log("First play blocked:", error));
+        }, { once: true }); // Runs only once
+    </script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f8f9fa;
+            text-align: center;
+        }
+
+        .container {
+            display: flex;
+            justify-content: space-around;
+            padding: 20px;
+        }
+
+        .dataBox {
+            width: 45%;
+            height: 300px;
+            overflow-y: auto;
+            border: 3px solid #007bff;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .entry {
+            padding: 10px;
+            margin: 5px;
+            border-radius: 5px;
+            background: #007bff;
+            color: white;
+            font-weight: bold;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .highlight {
+            background: #28a745 !important;
+        }
+
+        #latestGestureContainer {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 10px;
+            background: white;
+            border: 3px solid #28a745;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2);
+            display: inline-block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <h1>Live Hand Fluctuation Monitoring System</h1>
+
+    <div class="container">
+        <div class="dataBox">
+            <h2>Raw Sensor Data</h2>
+            <div id="rawDataDiv"></div>
+        </div>
+        <div class="dataBox">
+            <h2>Extracted Gesture Messages</h2>
+            <div id="gestureDataDiv"></div>
+        </div>
+    </div>
+
+    <div id="latestGestureContainer">
+        <h2>Latest Gesture</h2>
+        <p id="latestGesture">No gesture detected</p>
+    </div>
+
+    <!-- Audio Element for Gesture Playback -->
+    <div class="voices">
+        <audio id="gestureAudio" controls></audio>
+    </div>
+    <br><br><br><br><br>
+</body>
+</html>
+ 
